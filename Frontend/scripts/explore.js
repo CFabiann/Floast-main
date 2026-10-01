@@ -7,7 +7,6 @@ import { getCurrentUser, onAuthChange } from "./auth.js";
 
 // --- Variables de Estado ---
 let currentLocation = { lat: null, lng: null };
-const CHILPANCINGO_COORDS = { lat: 17.5500, lng: -99.5000 };
 
 // Variables de paginación
 let currentPage = 1;
@@ -52,29 +51,79 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // --- 3. Geolocalización ---
 function requestLocationAndFetch() {
+    const locationStatus = document.getElementById("locationStatus");
+    const btnRetryLocation = document.getElementById("btnRetryLocation");
+
+    // Reiniciar UI a estado de carga
+    locationStatus.className = "location-status";
+    locationStatus.innerHTML = `<span class="pulse-dot"></span> Detectando ubicación...`;
+    locationStatus.style.color = "var(--color-success)";
+    btnRetryLocation.hidden = true;
+
     if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(
+            // ÉXITO
             (position) => {
                 currentLocation.lat = position.coords.latitude;
                 currentLocation.lng = position.coords.longitude;
-                locationStatus.innerHTML = `<i data-lucide="check-circle"></i> Cerca de ti`;
+                
+                locationStatus.innerHTML = `<i data-lucide="check-circle"></i> Ubicación obtenida`;
                 locationStatus.style.color = "var(--color-success)";
                 lucide.createIcons();
+                
+                // Si tenemos ubicación, buscamos los inmuebles
                 fetchProperties();
             },
+            // ERROR O PERMISO DENEGADO
             (error) => {
-                console.warn("Ubicación denegada. Usando fallback (Chilpancingo).");
-                currentLocation = CHILPANCINGO_COORDS;
-                locationStatus.innerHTML = `<i data-lucide="map"></i> Chilpancingo, Gro.`;
-                locationStatus.style.color = "var(--color-text-muted)";
+                console.warn("Ubicación denegada o fallida:", error.message);
+                currentLocation = { lat: null, lng: null }; // Limpiamos coordenadas
+
+                // Cambiamos el estatus a rojo (Error)
+                locationStatus.className = "location-status status-error";
+                locationStatus.innerHTML = `<i data-lucide="alert-triangle"></i> Permiso denegado`;
+                locationStatus.style.color = "var(--color-error)";
+                btnRetryLocation.hidden = false; // Mostramos botón de reintentar
                 lucide.createIcons();
-                fetchProperties();
-            }
+
+                // Mostramos el estado vacío con un mensaje específico
+                showLocationErrorState();
+            },
+            // Opciones para mayor precisión
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     } else {
-        fetchProperties(); 
+        // Navegador no soporta GPS
+        locationStatus.className = "location-status status-error";
+        locationStatus.innerHTML = `<i data-lucide="x-circle"></i> GPS no soportado`;
+        locationStatus.style.color = "var(--color-error)";
+        showLocationErrorState();
     }
 }
+
+// NUEVA FUNCIÓN: Muestra un mensaje claro en el centro de la pantalla
+function showLocationErrorState() {
+    document.getElementById("exploreLoading").hidden = true;
+    document.getElementById("exploreGrid").hidden = true;
+    document.getElementById("paginationControls").hidden = true;
+    
+    const exploreEmpty = document.getElementById("exploreEmpty");
+    exploreEmpty.hidden = false;
+
+    // Cambiamos el texto y el ícono del estado vacío
+    exploreEmpty.querySelector(".empty-icon").setAttribute("data-lucide", "map-pin-off");
+    exploreEmpty.querySelector(".empty-title").textContent = "Ubicación Requerida";
+    exploreEmpty.querySelector(".empty-sub").textContent = "Para mostrarte inmuebles cerca de ti, necesitamos acceso a tu ubicación. Por favor, activa el permiso en el candado de la barra de direcciones de tu navegador y presiona reintentar.";
+    
+    document.getElementById("btnEmptyClear").hidden = true; // Ocultamos el botón de limpiar filtros porque no aplica aquí
+    
+    lucide.createIcons();
+}
+
+// NUEVO EVENTO: Darle vida al botón de reintentar
+document.getElementById("btnRetryLocation")?.addEventListener("click", () => {
+    requestLocationAndFetch();
+});
 
 // --- 4. Obtener Propiedades (Filtros + Paginación) ---
 async function fetchProperties() {

@@ -49,11 +49,16 @@
         <button id="btnResetFilters" class="btn-clear" title="Limpiar filtros"><i data-lucide="rotate-ccw"></i></button>
       </div>
 
+      <<!-- Ubicación detectada -->
       <div class="filter-section">
         <p class="filter-title"><i data-lucide="map-pin"></i> Zona de Búsqueda</p>
         <div class="location-status" id="locationStatus">
           <span class="pulse-dot"></span> Detectando ubicación...
         </div>
+        <!-- NUEVO: Botón para reintentar pedir ubicación (oculto por defecto) -->
+        <button id="btnRetryLocation" class="btn-secondary w-full mt-4" hidden style="font-size: 0.75rem;">
+          <i data-lucide="refresh-cw"></i> Reintentar ubicación
+        </button>
       </div>
 
       <div class="filter-section">

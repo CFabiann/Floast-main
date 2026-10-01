@@ -239,7 +239,6 @@ export async function deleteProperty(id, userId) {
   }
 }
 
-// Este será el endpoint que el de backend debe crear: GET /api/properties/public
 // Añadimos page (por defecto 0 o 1, según configure Spring Boot) y size (ej. 12 tarjetas)
 export async function getPublicProperties(filters = {}, page = 1, size = 12) {
   try {
@@ -265,7 +264,6 @@ export async function getPublicProperties(filters = {}, page = 1, size = 12) {
     const response = await fetch(url);
     if (!response.ok) throw new Error("Error fetching public properties");
 
-    // Ahora esperamos un objeto con { content: [...], totalPages: X }
     return await response.json();
   } catch (error) {
     console.error("Error:", error);
