@@ -29,7 +29,6 @@ const btnEmptyClear = document.getElementById("btnEmptyClear");
 const btnPublishProperty = document.getElementById("btnPublishProperty");
 
 // --- 1. Observador de Sesión Reactivo ---
-// Esto espera pacientemente a que Firebase responda y cambia la UI acorde.
 onAuthChange((user) => {
     const authButtons = document.getElementById("authButtons");
     const userMenu = document.getElementById("userMenu");
@@ -54,7 +53,6 @@ function requestLocationAndFetch() {
     const locationStatus = document.getElementById("locationStatus");
     const btnRetryLocation = document.getElementById("btnRetryLocation");
 
-    // Reiniciar UI a estado de carga
     locationStatus.className = "location-status";
     locationStatus.innerHTML = `<span class="pulse-dot"></span> Detectando ubicación...`;
     locationStatus.style.color = "var(--color-success)";
@@ -71,7 +69,6 @@ function requestLocationAndFetch() {
                 locationStatus.style.color = "var(--color-success)";
                 lucide.createIcons();
                 
-                // Si tenemos ubicación, buscamos los inmuebles
                 fetchProperties();
             },
             // ERROR O PERMISO DENEGADO
@@ -86,10 +83,8 @@ function requestLocationAndFetch() {
                 btnRetryLocation.hidden = false; // Mostramos botón de reintentar
                 lucide.createIcons();
 
-                // Mostramos el estado vacío con un mensaje específico
                 showLocationErrorState();
             },
-            // Opciones para mayor precisión
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     } else {
@@ -101,8 +96,7 @@ function requestLocationAndFetch() {
     }
 }
 
-// NUEVA FUNCIÓN: Muestra un mensaje claro en el centro de la pantalla
-function showLocationErrorState() {
+    function showLocationErrorState() {
     document.getElementById("exploreLoading").hidden = true;
     document.getElementById("exploreGrid").hidden = true;
     document.getElementById("paginationControls").hidden = true;
@@ -110,18 +104,16 @@ function showLocationErrorState() {
     const exploreEmpty = document.getElementById("exploreEmpty");
     exploreEmpty.hidden = false;
 
-    // Cambiamos el texto y el ícono del estado vacío
     exploreEmpty.querySelector(".empty-icon").setAttribute("data-lucide", "map-pin-off");
     exploreEmpty.querySelector(".empty-title").textContent = "Ubicación Requerida";
     exploreEmpty.querySelector(".empty-sub").textContent = "Para mostrarte inmuebles cerca de ti, necesitamos acceso a tu ubicación. Por favor, activa el permiso en el candado de la barra de direcciones de tu navegador y presiona reintentar.";
     
-    document.getElementById("btnEmptyClear").hidden = true; // Ocultamos el botón de limpiar filtros porque no aplica aquí
+    document.getElementById("btnEmptyClear").hidden = true;  
     
     lucide.createIcons();
 }
 
-// NUEVO EVENTO: Darle vida al botón de reintentar
-document.getElementById("btnRetryLocation")?.addEventListener("click", () => {
+    document.getElementById("btnRetryLocation")?.addEventListener("click", () => {
     requestLocationAndFetch();
 });
 

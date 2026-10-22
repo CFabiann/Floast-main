@@ -48,6 +48,7 @@ const editUnitTitle = document.getElementById("editUnitTitle");
 let currentProp = null;
 let currentUnits = [];
 let activeUnitId = null;
+let currentMap = null; // Instancia global de Leaflet
 
 const TYPE_LABELS = { vivienda: "Vivienda", edificio: "Edificio" };
 const BUILDING_LABELS = { normal: "Normal", hibrido: "Híbrido" };
@@ -128,11 +129,12 @@ async function init() {
     }
     // ==================================================================
 
-    renderHeader(currentProp);
-    renderContent(currentProp, currentUnits);
-
+    // Mostrar el contenedor antes de renderizar para que el mapa calcule bien su tamaño
     loadingScreen.hidden = true;
     propMain.hidden = false;
+
+    renderHeader(currentProp);
+    renderContent(currentProp, currentUnits);
     lucide.createIcons();
 
   } catch (err) {
@@ -171,6 +173,7 @@ function renderContent(prop, units) {
     singleView.hidden = false;
     singleDetail.innerHTML = buildSingleHTML(prop);
     bindDetailActions(singleDetail, null, true);
+    initPropertyMap(prop);
   } else {
     multiView.hidden = false;
     singleView.hidden = true;
@@ -233,6 +236,17 @@ function buildSingleHTML(prop) {
           <button class="card-edit-btn" data-action="edit-tenant-single"><i data-lucide="pencil"></i>Editar</button>
         </div>
         ${tenantContent}
+      </div>
+
+      <!-- Tarjeta de Ubicación y Mapa -->
+      <div class="detail-card full-width">
+        <div class="detail-card-header">
+          <span class="detail-card-title"><i data-lucide="map"></i>Ubicación</span>
+        </div>
+        <p class="detail-data-label" style="margin-bottom: 0.85rem;">
+          <i data-lucide="map-pin"></i> ${prop.location}
+        </p>
+        <div id="propertyMap" style="width: 100%; height: 280px; border-radius: var(--radius-md); z-index: 1;"></div>
       </div>
     </div>
   `;
@@ -301,6 +315,7 @@ function selectUnit(unitId) {
   unitDetail.innerHTML = "";
   unitDetail.insertAdjacentHTML("beforeend", buildUnitDetailHTML(unit));
   bindDetailActions(unitDetail, unit, false);
+  initPropertyMap(currentProp);
   lucide.createIcons();
 }
 
@@ -341,8 +356,7 @@ function buildUnitDetailHTML(unit) {
           <div class="tenant-header-row">
             <div class="tenant-avatar">${getInitials(unit.tenant.name)}</div>
             <div>
-              <p class="tenant-name">${unit.tenant.name}</p>
-              ${unit.tenant.leaseEnd ? `<p class="tenant-since">Contrato hasta: ${formatDate(unit.tenant.leaseEnd)}</p>` : ""}
+              <p class="tenant-name">${unit.tenant.name}</p>${unit.tenant.leaseEnd ? `<p class="tenant-since">Contrato hasta: ${formatDate(unit.tenant.leaseEnd)}</p>` : ""}
             </div>
           </div>
           <div class="detail-data-list">
@@ -365,6 +379,17 @@ function buildUnitDetailHTML(unit) {
         </div>
         <p class="notes-text">${unit.notes}</p>
       </div>` : ""}
+
+      <!-- Tarjeta de Ubicación y Mapa -->
+      <div class="detail-card full-width">
+        <div class="detail-card-header">
+          <span class="detail-card-title"><i data-lucide="map"></i>Ubicación del Inmueble</span>
+        </div>
+        <p class="detail-data-label" style="margin-bottom: 0.85rem;">
+          <i data-lucide="map-pin"></i> ${currentProp?.location || ""}
+        </p>
+        <div id="propertyMap" style="width: 100%; height: 280px; border-radius: var(--radius-md); z-index: 1;"></div>
+      </div>
     </div>
   `;
 }
@@ -449,6 +474,9 @@ editPropForm.addEventListener("submit", async e => {
     if (currentProp.rentMode === "completo") {
       singleDetail.innerHTML = buildSingleHTML(currentProp);
       bindDetailActions(singleDetail, null, true);
+      initPropertyMap(currentProp);
+    } else if (activeUnitId) {
+      selectUnit(activeUnitId);
     }
     lucide.createIcons();
     hideModal(modalEditProp);
@@ -566,7 +594,7 @@ editTenantSingleForm?.addEventListener("submit", async e => {
 
   const hasTenant = tenantData.name !== "";
   const dataToUpdate = {
-    tenant: tenantData
+    tenant: hasTenant ? tenantData : null
   };
 
   try {
@@ -578,6 +606,7 @@ editTenantSingleForm?.addEventListener("submit", async e => {
     renderHeader(currentProp);
     singleDetail.innerHTML = buildSingleHTML(currentProp);
     bindDetailActions(singleDetail, null, true);
+    initPropertyMap(currentProp);
     lucide.createIcons();
 
     hideModal(modalEditTenantSingle);
@@ -636,7 +665,7 @@ editTenantUnitForm?.addEventListener("submit", async e => {
   const nuevoEstado = hasTenant ? "rentada" : "disponible";
 
   const dataToUpdate = {
-    tenant: tenantData,
+    tenant: hasTenant ? tenantData : null,
     status: nuevoEstado
   };
 
@@ -683,6 +712,36 @@ editTenantUnitForm?.addEventListener("submit", async e => {
     submitBtn.textContent = "Guardar Inquilino";
   }
 });
+
+// ── Inicialización del Mapa (Leaflet) ─────────────────────────
+function initPropertyMap(prop) {
+  const mapContainer = document.getElementById("propertyMap");
+  if (!mapContainer || typeof L === "undefined") return;
+
+  if (currentMap) {
+    currentMap.remove();
+    currentMap = null;
+  }
+
+  // Coordenadas del inmueble (con fallback temporal si aún no tiene lat/lng en BD)
+  const lat = prop?.lat ?? 17.5506;
+  const lng = prop?.lng ?? -99.5024;
+
+  currentMap = L.map("propertyMap").setView([lat, lng], 16);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(currentMap);
+
+  L.marker([lat, lng])
+    .addTo(currentMap)
+    .bindPopup(`<b>${prop?.name || "Inmueble"}</b><br>${prop?.location || ""}`)
+    .openPopup();
+
+  setTimeout(() => {
+    if (currentMap) currentMap.invalidateSize();
+  }, 150);
+}
 
 // ── Helpers ───────────────────────────────────────────────────
 function showModal(m) { m.hidden = false; document.body.style.overflow = "hidden"; setTimeout(() => m.querySelector("input,select,button")?.focus(), 50); }
