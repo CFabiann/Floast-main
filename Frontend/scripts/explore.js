@@ -10,7 +10,7 @@ let currentLocation = { lat: null, lng: null };
 
 // Variables de paginación
 let currentPage = 1;
-const pageSize = 12; 
+const pageSize = 12;
 let totalPages = 1;
 
 // --- Elementos DOM ---
@@ -64,11 +64,11 @@ function requestLocationAndFetch() {
             (position) => {
                 currentLocation.lat = position.coords.latitude;
                 currentLocation.lng = position.coords.longitude;
-                
+
                 locationStatus.innerHTML = `<i data-lucide="check-circle"></i> Ubicación obtenida`;
                 locationStatus.style.color = "var(--color-success)";
                 lucide.createIcons();
-                
+
                 fetchProperties();
             },
             // ERROR O PERMISO DENEGADO
@@ -96,24 +96,24 @@ function requestLocationAndFetch() {
     }
 }
 
-    function showLocationErrorState() {
+function showLocationErrorState() {
     document.getElementById("exploreLoading").hidden = true;
     document.getElementById("exploreGrid").hidden = true;
     document.getElementById("paginationControls").hidden = true;
-    
+
     const exploreEmpty = document.getElementById("exploreEmpty");
     exploreEmpty.hidden = false;
 
     exploreEmpty.querySelector(".empty-icon").setAttribute("data-lucide", "map-pin-off");
     exploreEmpty.querySelector(".empty-title").textContent = "Ubicación Requerida";
     exploreEmpty.querySelector(".empty-sub").textContent = "Para mostrarte inmuebles cerca de ti, necesitamos acceso a tu ubicación. Por favor, activa el permiso en el candado de la barra de direcciones de tu navegador y presiona reintentar.";
-    
-    document.getElementById("btnEmptyClear").hidden = true;  
-    
+
+    document.getElementById("btnEmptyClear").hidden = true;
+
     lucide.createIcons();
 }
 
-    document.getElementById("btnRetryLocation")?.addEventListener("click", () => {
+document.getElementById("btnRetryLocation")?.addEventListener("click", () => {
     requestLocationAndFetch();
 });
 
@@ -124,21 +124,28 @@ async function fetchProperties() {
     exploreEmpty.hidden = true;
     document.getElementById("paginationControls").hidden = true;
 
+    const rawType = document.getElementById("filterType").value;
+    const [selectedType, selectedRentMode, selectedBuildingType] = rawType.split("|");
+
     const filters = {
         lat: currentLocation.lat,
         lng: currentLocation.lng,
-        type: document.getElementById("filterType").value,
+        type: selectedType || "",
+        rentMode: selectedRentMode || "",
+        buildingType: selectedBuildingType || "",
         petsAllowed: document.getElementById("filterPets").checked,
         childrenAllowed: document.getElementById("filterChildren").checked,
         amenities: []
     };
+
+
 
     if (document.getElementById("filterWifi").checked) filters.amenities.push("internet");
     if (document.getElementById("filterWater").checked) filters.amenities.push("agua");
 
     try {
         const responseData = await getPublicProperties(filters, currentPage, pageSize);
-        
+
         if (!responseData) {
             renderExploreGrid([]);
             return;
@@ -158,7 +165,7 @@ async function fetchProperties() {
 // --- 5. Renderizar Tarjetas ---
 function renderExploreGrid(properties) {
     exploreLoading.hidden = true;
-    
+
     if (properties.length === 0) {
         exploreGrid.hidden = true;
         exploreEmpty.hidden = false;
@@ -229,7 +236,7 @@ function bindContactButtons() {
 if (btnPublishProperty) {
     btnPublishProperty.addEventListener("click", () => {
         const user = getCurrentUser();
-        
+
         if (!user) {
             sessionStorage.setItem("redirect_after_login", "dashboard.html?action=new");
             window.location.href = "login.html";
@@ -253,7 +260,7 @@ function updatePaginationUI() {
 
     paginationControls.hidden = false;
     indicator.textContent = `Página ${currentPage} de ${totalPages}`;
-    
+
     btnPrev.disabled = currentPage <= 1;
     btnNext.disabled = currentPage >= totalPages;
 }

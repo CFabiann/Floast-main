@@ -322,3 +322,14 @@
   border-color: rgba(240, 96, 96, 0.3);
   color: var(--color-error);
 }
+#filterType,
+#filterType option,
+#filterType optgroup {
+    background-color: #18181b; /* Fondo oscuro acorde a DOMI */
+    color: #f4f4f5;            /* Texto blanco claro */
+}
+
+#filterType optgroup {
+    color: #ff7a00;            /* Naranja para destacar las categorías */
+    font-weight: bold;
+}

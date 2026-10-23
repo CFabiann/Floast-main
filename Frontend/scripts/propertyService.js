@@ -256,6 +256,8 @@ export async function getPublicProperties(filters = {}, page = 1, size = 12) {
     if (filters.childrenAllowed)
       url.searchParams.append("childrenAllowed", "true");
     if (filters.type) url.searchParams.append("type", filters.type);
+    if (filters.rentMode) url.searchParams.append("rentMode", filters.rentMode);
+    if (filters.buildingType) url.searchParams.append("buildingType", filters.buildingType);
 
     if (filters.amenities && filters.amenities.length > 0) {
       url.searchParams.append("amenities", filters.amenities.join(","));
