@@ -65,6 +65,45 @@
       <div class="unit-detail" id="singleDetail"></div>
     </div>
 
+    <!-- ── Sección de Reseñas de Inquilinos ── -->
+    <section class="detail-card full-width reviews-section" id="reviewsSection">
+      <div class="reviews-header">
+        <div>
+          <span class="detail-card-title">
+            <i data-lucide="message-square-quote"></i> Reseñas de Inquilinos
+          </span>
+          <div class="reviews-summary" id="reviewsSummary">
+            <span class="reviews-avg" id="reviewsAvg">—</span>
+            <div class="reviews-stars" id="reviewsStars"></div>
+            <span class="reviews-count" id="reviewsCount">(0 opiniones)</span>
+          </div>
+        </div>
+
+        <!-- Botón visible solo si el usuario logueado es inquilino de esta propiedad -->
+        <button class="btn-submit" id="btnOpenReviewModal" hidden>
+          <i data-lucide="star" style="width:14px;height:14px;margin-right:4px"></i>
+          Calificar mi experiencia
+        </button>
+
+        <!-- Aviso informativo para visitantes o usuarios que no son inquilinos -->
+        <span class="tenant-only-badge" id="tenantOnlyNotice">
+          <i data-lucide="shield-check"></i> Solo inquilinos verificados pueden opinar
+        </span>
+      </div>
+
+      <!-- Lista de reseñas -->
+      <div class="reviews-list" id="reviewsList">
+        <!-- Se llena dinámicamente con JS -->
+      </div>
+
+      <!-- Paginación de reseñas -->
+      <div class="reviews-pagination" id="reviewsPagination" hidden>
+        <button type="button" class="btn-secondary" id="btnPrevReviews">Anteriores</button>
+        <span class="page-indicator" id="reviewsPageIndicator">Página 1</span>
+        <button type="button" class="btn-secondary" id="btnNextReviews">Siguientes</button>
+      </div>
+    </section>
+
   </main>
 
   <!-- ── Modal: editar propiedad ─────────────────────────────── -->
@@ -199,6 +238,7 @@
       </form>
     </div>
   </div>
+
   <!-- ── Modal: editar unidad ────────────────────────────────── -->
   <div class="modal-overlay" id="modalEditUnit" hidden>
     <div class="modal" role="dialog" aria-modal="true">
@@ -270,6 +310,58 @@
         <div class="modal-actions">
           <button type="button" class="btn-secondary" id="editUnitCancel">Cancelar</button>
           <button type="submit" class="btn-submit">Guardar Unidad</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Modal: Nueva Reseña (Inquilino Verificado) ──────────── -->
+  <div class="modal-overlay" id="modalReview" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
+      <div class="modal-header">
+        <h3 class="modal-title" id="reviewModalTitle">Calificar mi experiencia</h3>
+        <button class="modal-close" id="reviewModalClose" aria-label="Cerrar">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <form id="reviewForm" class="modal-form" novalidate>
+        <!-- Selector de Estrellas -->
+        <div class="form-group">
+          <label>Calificación general</label>
+          <div class="star-rating-select" id="starSelector" role="radiogroup" aria-label="Calificación de 1 a 5 estrellas">
+            <button type="button" class="star-btn" data-value="1" aria-label="1 estrella"><i data-lucide="star"></i></button>
+            <button type="button" class="star-btn" data-value="2" aria-label="2 estrellas"><i data-lucide="star"></i></button>
+            <button type="button" class="star-btn" data-value="3" aria-label="3 estrellas"><i data-lucide="star"></i></button>
+            <button type="button" class="star-btn" data-value="4" aria-label="4 estrellas"><i data-lucide="star"></i></button>
+            <button type="button" class="star-btn" data-value="5" aria-label="5 estrellas"><i data-lucide="star"></i></button>
+          </div>
+          <span class="error-message" id="reviewRatingError"></span>
+        </div>
+
+        <!-- Etiquetas rápidas (Chips) -->
+        <div class="form-group">
+          <label>¿Qué destacarías del inmueble? (Opcional)</label>
+          <div class="review-tags-selector" id="reviewTagsSelector">
+            <button type="button" class="tag-chip" data-tag="Agua constante">💧 Agua constante</button>
+            <button type="button" class="tag-chip" data-tag="Internet estable">📶 Internet estable</button>
+            <button type="button" class="tag-chip" data-tag="Zona segura">🔒 Zona segura</button>
+            <button type="button" class="tag-chip" data-tag="Ambiente tranquilo">🔇 Ambiente tranquilo</button>
+            <button type="button" class="tag-chip" data-tag="Buen trato del arrendador">🤝 Buen trato del arrendador</button>
+            <button type="button" class="tag-chip" data-tag="Buena ubicación comercial">🏪 Buena ubicación comercial</button>
+          </div>
+        </div>
+
+        <!-- Comentario -->
+        <div class="form-group">
+          <label for="reviewComment">Tu reseña</label>
+          <textarea id="reviewComment" rows="3" placeholder="Comparte cómo ha sido vivir o tener tu negocio aquí..." required></textarea>
+          <span class="error-message" id="reviewCommentError"></span>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="reviewModalCancel">Cancelar</button>
+          <button type="submit" class="btn-submit" id="reviewSubmitBtn">Publicar Reseña</button>
         </div>
       </form>
     </div>

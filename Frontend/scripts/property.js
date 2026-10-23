@@ -11,6 +11,7 @@
 
 import { getPropertyById, updateProperty } from "./propertyService.js";
 import { getUnits, updateUnit } from "./unitService.js";
+import { getReviews, addReview } from "./reviewService.js";
 import { onAuthChange, getCurrentUser } from "./auth.js";
 
 onAuthChange(user => { if (!user) window.location.href = "login.html"; });
@@ -49,6 +50,14 @@ let currentProp = null;
 let currentUnits = [];
 let activeUnitId = null;
 let currentMap = null; // Instancia global de Leaflet
+
+// Variables de estado para Reseñas
+let reviewPage = 1;
+const reviewSize = 5;
+let reviewTotalPages = 1;
+let selectedRating = 0;
+let selectedTags = [];
+let verifiedTenantUnitLabel = null;
 
 const TYPE_LABELS = { vivienda: "Vivienda", edificio: "Edificio" };
 const BUILDING_LABELS = { normal: "Normal", hibrido: "Híbrido" };
@@ -135,6 +144,7 @@ async function init() {
 
     renderHeader(currentProp);
     renderContent(currentProp, currentUnits);
+    await loadPropertyReviews(propId);
     lucide.createIcons();
 
   } catch (err) {
@@ -540,6 +550,7 @@ editUnitForm.addEventListener("submit", async e => {
     if (idx !== -1) currentUnits[idx] = { ...currentUnits[idx], ...data };
     renderUnitsBar(currentUnits, currentProp);
     selectUnit(unitId);
+    checkIfUserIsTenant(currentProp, currentUnits);
     lucide.createIcons();
     hideModal(modalEditUnit);
   } catch (err) {
@@ -554,6 +565,8 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
     if (!modalEditProp.hidden) hideModal(modalEditProp);
     if (!modalEditUnit.hidden) hideModal(modalEditUnit);
+    const modalRev = document.getElementById("modalReview");
+    if (modalRev && !modalRev.hidden) hideModal(modalRev);
   }
 });
 
@@ -607,6 +620,7 @@ editTenantSingleForm?.addEventListener("submit", async e => {
     singleDetail.innerHTML = buildSingleHTML(currentProp);
     bindDetailActions(singleDetail, null, true);
     initPropertyMap(currentProp);
+    checkIfUserIsTenant(currentProp, currentUnits);
     lucide.createIcons();
 
     hideModal(modalEditTenantSingle);
@@ -701,6 +715,7 @@ editTenantUnitForm?.addEventListener("submit", async e => {
 
     renderUnitsBar(currentUnits, currentProp);
     selectUnit(unitId);
+    checkIfUserIsTenant(currentProp, currentUnits);
     lucide.createIcons();
 
     hideModal(modalEditTenantUnit);
@@ -710,6 +725,259 @@ editTenantUnitForm?.addEventListener("submit", async e => {
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = "Guardar Inquilino";
+  }
+});
+
+// ============================================================
+// SISTEMA DE RESEÑAS (INQUILINOS VERIFICADOS)
+// ============================================================
+async function loadPropertyReviews(id) {
+  const data = await getReviews(id, reviewPage, reviewSize);
+  if (!data) return;
+
+  reviewTotalPages = data.totalPages || 1;
+
+  // 1. Actualizar Resumen (Estrellas y Promedio)
+  const avgEl = document.getElementById("reviewsAvg");
+  const starsEl = document.getElementById("reviewsStars");
+  const countEl = document.getElementById("reviewsCount");
+
+  if (avgEl) avgEl.textContent = data.averageRating > 0 ? Number(data.averageRating).toFixed(1) : "—";
+  if (countEl) countEl.textContent = `(${data.totalReviews || 0} opiniones)`;
+  
+  if (starsEl) {
+    starsEl.innerHTML = "";
+    const fullStars = Math.round(data.averageRating || 0);
+    for (let i = 1; i <= 5; i++) {
+      starsEl.innerHTML += `<i data-lucide="star" style="color: ${i <= fullStars ? 'var(--color-warning)' : 'var(--color-border)'}"></i>`;
+    }
+  }
+
+  // 2. Renderizar Lista de Reseñas
+  const listEl = document.getElementById("reviewsList");
+  if (listEl) {
+    listEl.innerHTML = "";
+
+    if (!data.content || data.content.length === 0) {
+      listEl.innerHTML = `<p class="tenant-empty" style="padding:1rem 0;">Aún no hay reseñas de inquilinos para este inmueble.</p>`;
+    } else {
+      data.content.forEach(rev => {
+        const card = document.createElement("div");
+        card.className = "review-card";
+        
+        let tagsHtml = "";
+        if (rev.tags && rev.tags.length > 0) {
+          tagsHtml = `<div class="review-tags-display">` + 
+            rev.tags.map(t => `<span class="review-tag-chip">${t}</span>`).join("") + 
+            `</div>`;
+        }
+
+        let revStars = "";
+        for (let s = 1; s <= 5; s++) {
+          revStars += `<i data-lucide="star" style="width:12px;height:12px; color: ${s <= rev.rating ? 'var(--color-warning)' : 'var(--color-border)'}"></i>`;
+        }
+
+        card.innerHTML = `
+          <div class="review-card-header">
+            <div class="review-author-info">
+              <div class="review-avatar">${getInitials(rev.userName)}</div>
+              <div>
+                <p class="review-author-name">${rev.userName}</p>
+                <div style="display:flex; gap:4px; align-items:center;">
+                  <div style="display:flex; gap:1px;">${revStars}</div>
+                  ${rev.unitLabel ? `<span style="font-size:0.68rem; color:var(--color-text-dim);">· ${rev.unitLabel}</span>` : ""}
+                </div>
+              </div>
+            </div>
+            <span class="review-date">${rev.createdAt || ""}</span>
+          </div>
+          <p class="review-comment">${rev.comment}</p>
+          ${tagsHtml}
+        `;
+        listEl.appendChild(card);
+      });
+    }
+  }
+
+  // 3. Actualizar Paginación de Reseñas
+  updateReviewsPaginationUI();
+
+  // 4. Validar si el usuario actual es el inquilino verificado de este inmueble
+  checkIfUserIsTenant(currentProp, currentUnits);
+
+  lucide.createIcons();
+}
+
+function updateReviewsPaginationUI() {
+  const pagContainer = document.getElementById("reviewsPagination");
+  const btnPrev = document.getElementById("btnPrevReviews");
+  const btnNext = document.getElementById("btnNextReviews");
+  const indicator = document.getElementById("reviewsPageIndicator");
+
+  if (!pagContainer) return;
+
+  if (reviewTotalPages <= 1) {
+    pagContainer.hidden = true;
+    return;
+  }
+
+  pagContainer.hidden = false;
+  if (indicator) indicator.textContent = `Página ${reviewPage} de ${reviewTotalPages}`;
+  if (btnPrev) btnPrev.disabled = reviewPage <= 1;
+  if (btnNext) btnNext.disabled = reviewPage >= reviewTotalPages;
+}
+
+document.getElementById("btnPrevReviews")?.addEventListener("click", () => {
+  if (reviewPage > 1) {
+    reviewPage--;
+    loadPropertyReviews(propId);
+  }
+});
+
+document.getElementById("btnNextReviews")?.addEventListener("click", () => {
+  if (reviewPage < reviewTotalPages) {
+    reviewPage++;
+    loadPropertyReviews(propId);
+  }
+});
+
+// Validación de Inquilino Verificado por correo electrónico
+function checkIfUserIsTenant(prop, units) {
+  const user = getCurrentUser();
+  const btnOpenModal = document.getElementById("btnOpenReviewModal");
+  const noticeBadge = document.getElementById("tenantOnlyNotice");
+
+  verifiedTenantUnitLabel = null;
+
+  if (!user || !user.email || !prop) {
+    if (btnOpenModal) btnOpenModal.hidden = true;
+    if (noticeBadge) noticeBadge.hidden = false;
+    return;
+  }
+
+  const userEmail = user.email.toLowerCase().trim();
+  let isTenantFound = false;
+
+  // Revisar si es inquilino de propiedad completa
+  if (prop.tenant?.email && prop.tenant.email.toLowerCase().trim() === userEmail) {
+    isTenantFound = true;
+  }
+
+  // O si es inquilino de alguna unidad individual en un edificio
+  if (!isTenantFound && units && units.length > 0) {
+    const matchUnit = units.find(u => u.tenant?.email && u.tenant.email.toLowerCase().trim() === userEmail);
+    if (matchUnit) {
+      isTenantFound = true;
+      verifiedTenantUnitLabel = matchUnit.label;
+    }
+  }
+
+  if (isTenantFound) {
+    if (btnOpenModal) btnOpenModal.hidden = false;
+    if (noticeBadge) noticeBadge.hidden = true;
+  } else {
+    if (btnOpenModal) btnOpenModal.hidden = true;
+    if (noticeBadge) noticeBadge.hidden = false;
+  }
+}
+
+// ── Lógica del Modal de Reseñas ───────────────────────────────
+const modalReview = document.getElementById("modalReview");
+const btnOpenReviewModal = document.getElementById("btnOpenReviewModal");
+const reviewModalClose = document.getElementById("reviewModalClose");
+const reviewModalCancel = document.getElementById("reviewModalCancel");
+const reviewForm = document.getElementById("reviewForm");
+
+btnOpenReviewModal?.addEventListener("click", () => {
+  selectedRating = 0;
+  selectedTags = [];
+  const commentEl = document.getElementById("reviewComment");
+  if (commentEl) commentEl.value = "";
+  document.getElementById("reviewRatingError").textContent = "";
+  document.getElementById("reviewCommentError").textContent = "";
+  document.querySelectorAll(".star-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tag-chip").forEach(c => c.classList.remove("selected"));
+  showModal(modalReview);
+});
+
+[reviewModalClose, reviewModalCancel].forEach(b => b?.addEventListener("click", () => hideModal(modalReview)));
+modalReview?.addEventListener("click", e => { if (e.target === modalReview) hideModal(modalReview); });
+
+// Selección de estrellas interactivas
+document.querySelectorAll(".star-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    selectedRating = Number(btn.getAttribute("data-value"));
+    document.querySelectorAll(".star-btn").forEach((b, idx) => {
+      b.classList.toggle("active", idx < selectedRating);
+    });
+    document.getElementById("reviewRatingError").textContent = "";
+  });
+});
+
+// Selección de etiquetas rápidas (Chips)
+document.querySelectorAll(".tag-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const tag = chip.getAttribute("data-tag");
+    if (selectedTags.includes(tag)) {
+      selectedTags = selectedTags.filter(t => t !== tag);
+      chip.classList.remove("selected");
+    } else {
+      selectedTags.push(tag);
+      chip.classList.add("selected");
+    }
+  });
+});
+
+// Enviar Reseña
+reviewForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const comment = document.getElementById("reviewComment").value.trim();
+  const ratingError = document.getElementById("reviewRatingError");
+  const commentError = document.getElementById("reviewCommentError");
+
+  let valid = true;
+  if (selectedRating === 0) {
+    ratingError.textContent = "Selecciona al menos 1 estrella.";
+    valid = false;
+  } else {
+    ratingError.textContent = "";
+  }
+
+  if (!comment) {
+    commentError.textContent = "Escribe un comentario sobre tu experiencia.";
+    valid = false;
+  } else {
+    commentError.textContent = "";
+  }
+
+  if (!valid) return;
+
+  const submitBtn = document.getElementById("reviewSubmitBtn");
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Publicando...";
+
+  const user = getCurrentUser();
+  const reviewPayload = {
+    userId: user.uid,
+    userName: user.name || user.displayName || "Inquilino Verificado",
+    userEmail: user.email,
+    unitLabel: verifiedTenantUnitLabel,
+    rating: selectedRating,
+    tags: selectedTags,
+    comment: comment
+  };
+
+  try {
+    await addReview(propId, reviewPayload);
+    hideModal(modalReview);
+    reviewPage = 1;
+    await loadPropertyReviews(propId);
+  } catch (err) {
+    console.error("Error al publicar reseña:", err);
+    alert("No se pudo publicar la reseña. Intenta de nuevo.");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Publicar Reseña";
   }
 });
 

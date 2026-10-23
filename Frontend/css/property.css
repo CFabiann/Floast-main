@@ -789,3 +789,214 @@ body::after {
   .btn-back, .btn-icon, .unit-tab, .card-edit-btn,
   .btn-submit, .btn-secondary { transition: none; }
 }
+
+/* ============================================================
+   FLOAST — Estilos para el Sistema de Reseñas
+   ============================================================ */
+
+.reviews-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.reviews-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reviews-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+.reviews-avg {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.reviews-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--color-warning); /* #F2B200 */
+}
+
+.reviews-stars i {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.reviews-count {
+  font-size: 0.78rem;
+  color: var(--color-text-dim);
+}
+
+/* Badge de inquilino verificado */
+.tenant-only-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-full);
+}
+.tenant-only-badge i { width: 13px; height: 13px; color: var(--color-info); }
+
+/* ── Lista de Reseñas ── */
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.review-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.review-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.review-author-info {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.review-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-bright));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.review-author-name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.review-date {
+  font-size: 0.68rem;
+  color: var(--color-text-dim);
+}
+
+.review-comment {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+/* Chips de etiquetas en la reseña */
+.review-tags-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.review-tag-chip {
+  font-size: 0.68rem;
+  background: var(--color-accent-muted);
+  border: 1px solid var(--color-accent-border);
+  color: var(--color-accent-bright);
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+/* ── Modal de Calificación: Estrellas y Chips Interactivos ── */
+.star-rating-select {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.star-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-border-strong);
+  transition: color 0.15s, transform 0.15s;
+  padding: 0;
+}
+
+.star-btn i {
+  width: 26px;
+  height: 26px;
+  fill: currentColor;
+}
+
+.star-btn.active,
+.star-btn:hover {
+  color: var(--color-warning);
+  transform: scale(1.1);
+}
+
+.review-tags-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tag-chip {
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tag-chip:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.tag-chip.selected {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent-border);
+  color: var(--color-accent-bright);
+  box-shadow: 0 0 10px var(--color-accent-glow);
+}
+
+.reviews-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
