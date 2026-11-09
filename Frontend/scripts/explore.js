@@ -165,7 +165,7 @@ async function fetchProperties() {
 // --- 5. Renderizar Tarjetas ---
 function renderExploreGrid(properties) {
     exploreLoading.hidden = true;
-
+    
     if (properties.length === 0) {
         exploreGrid.hidden = true;
         exploreEmpty.hidden = false;
@@ -189,10 +189,16 @@ function renderExploreGrid(properties) {
         if (prop.amenities?.includes("internet")) badgesHtml += `<i data-lucide="wifi" title="Internet disponible"></i>`;
 
         const priceStr = prop.price ? `$${Number(prop.price).toLocaleString("es-MX")}` : "Consultar";
+        const coverImg = Array.isArray(prop.images) && prop.images.length > 0 ? prop.images[0] : null;
+        const defaultIcon = prop.type?.toLowerCase() === 'edificio' ? 'building-2' : 'house';
+
+        const illustrationContent = coverImg
+            ? `<img src="${coverImg}" alt="${prop.name}" class="card-cover-img" loading="lazy">`
+            : `<i data-lucide="${defaultIcon}" class="prop-icon"></i>`;
 
         card.innerHTML = `
             <div class="card-illustration" data-type="${prop.type?.toLowerCase() || 'vivienda'}">
-                <i data-lucide="${prop.type?.toLowerCase() === 'edificio' ? 'building-2' : 'house'}" class="prop-icon"></i>
+                ${illustrationContent}
             </div>
             <div class="card-body">
                 <p class="card-type">${prop.type || 'Inmueble'} · ${prop.rentMode || 'Completo'}</p>

@@ -12,6 +12,7 @@
 import { getPropertyById, updateProperty } from "./propertyService.js";
 import { getUnits, updateUnit } from "./unitService.js";
 import { getReviews, addReview } from "./reviewService.js";
+import { uploadImageToCloud, MAX_PHOTOS } from "./imageService.js";
 import { onAuthChange, getCurrentUser } from "./auth.js";
 
 onAuthChange(user => { if (!user) window.location.href = "login.html"; });
@@ -26,6 +27,7 @@ const propMain = document.getElementById("propMain");
 const headerName = document.getElementById("headerPropName");
 const headerMeta = document.getElementById("headerMeta");
 const propStatusBadge = document.getElementById("propStatusBadge");
+const btnEditPropHeader = document.getElementById("btnEditProp");
 const multiView = document.getElementById("multiView");
 const singleView = document.getElementById("singleView");
 const unitsBar = document.getElementById("unitsBar");
@@ -39,6 +41,11 @@ const editPropClose = document.getElementById("editPropClose");
 const editPropCancel = document.getElementById("editPropCancel");
 const editPropSubmit = document.getElementById("editPropSubmit");
 
+// Controles de fotos (Propiedad)
+const ePropPhotosInput = document.getElementById("ePropPhotosInput");
+const ePropPhotosPreview = document.getElementById("ePropPhotosPreview");
+const ePropPhotosError = document.getElementById("ePropPhotosError");
+
 // Modal editar unidad
 const modalEditUnit = document.getElementById("modalEditUnit");
 const editUnitForm = document.getElementById("editUnitForm");
@@ -46,10 +53,25 @@ const editUnitClose = document.getElementById("editUnitClose");
 const editUnitCancel = document.getElementById("editUnitCancel");
 const editUnitTitle = document.getElementById("editUnitTitle");
 
+// Controles de fotos (Unidad)
+const eUnitPhotosInput = document.getElementById("eUnitPhotosInput");
+const eUnitPhotosPreview = document.getElementById("eUnitPhotosPreview");
+const eUnitPhotosError = document.getElementById("eUnitPhotosError");
+
+// Lightbox (Visor de fotos)
+const lightboxModal = document.getElementById("lightboxModal");
+const lightboxImage = document.getElementById("lightboxImage");
+const lightboxClose = document.getElementById("lightboxClose");
+
 let currentProp = null;
 let currentUnits = [];
 let activeUnitId = null;
 let currentMap = null; // Instancia global de Leaflet
+
+// Estado temporal de fotografías en los modales
+// Cada elemento puede ser un string (URL ya guardada) o { file, previewUrl }
+let tempPropPhotos = [];
+let tempUnitPhotos = [];
 
 // Variables de estado para Reseñas
 let reviewPage = 1;
@@ -81,7 +103,8 @@ async function init() {
           category: "local",
           label: `Local ${i}`,
           status: "disponible",
-          price: 0
+          price: 0,
+          images: []
         });
       }
 
@@ -92,7 +115,8 @@ async function init() {
           category: "habitacion",
           label: `Habitación ${i}`,
           status: "disponible",
-          price: 0
+          price: 0,
+          images: []
         });
       }
     }
@@ -174,6 +198,8 @@ function renderHeader(prop) {
   propStatusBadge.dataset.status = prop.status;
 }
 
+btnEditPropHeader?.addEventListener("click", () => openEditPropModal());
+
 // ── Contenido principal ───────────────────────────────────────
 function renderContent(prop, units) {
   const isCompleto = prop.rentMode === "completo";
@@ -190,6 +216,61 @@ function renderContent(prop, units) {
     renderUnitsBar(units, prop);
     if (units.length > 0) selectUnit(units[0].id);
   }
+}
+
+// ── Construcción de Galería Visual ────────────────────────────
+function buildGalleryCardHTML(images, title, editAction, unitId = "") {
+  const photos = Array.isArray(images) ? images.filter(Boolean) : [];
+  const dataIdAttr = unitId ? `data-id="${unitId}"` : "";
+
+  if (photos.length === 0) {
+    return `
+      <div class="detail-card full-width">
+        <div class="detail-card-header">
+          <span class="detail-card-title"><i data-lucide="image"></i>${title}</span>
+          <button class="card-edit-btn" data-action="${editAction}" ${dataIdAttr}>
+            <i data-lucide="camera"></i>Agregar fotos
+          </button>
+        </div>
+        <div class="tenant-empty" style="padding: 1.25rem 0;">
+          <i data-lucide="image-off"></i>
+          <p>Sin fotografías registradas</p>
+          <p style="font-size:.75rem;margin-top:.25rem">Haz clic en Agregar fotos para subir entre 1 y 5 imágenes</p>
+        </div>
+      </div>
+    `;
+  }
+
+  const mainPhoto = photos[0];
+  const restPhotos = photos.slice(1, MAX_PHOTOS);
+  const galleryClass = restPhotos.length === 0 ? "prop-gallery single-photo" : "prop-gallery";
+
+  const thumbsHTML = restPhotos.length > 0
+    ? `<div class="prop-gallery-thumbs">
+        ${restPhotos.map((src, idx) => `
+          <div class="prop-gallery-thumb" data-lightbox-src="${src}">
+            <img src="${src}" alt="${title} - foto ${idx + 2}" loading="lazy">
+          </div>
+        `).join("")}
+      </div>`
+    : "";
+
+  return `
+    <div class="detail-card full-width">
+      <div class="detail-card-header">
+        <span class="detail-card-title"><i data-lucide="image"></i>${title} (${photos.length}/${MAX_PHOTOS})</span>
+        <button class="card-edit-btn" data-action="${editAction}" ${dataIdAttr}>
+          <i data-lucide="camera"></i>Gestionar fotos
+        </button>
+      </div>
+      <div class="${galleryClass}">
+        <div class="prop-gallery-main" data-lightbox-src="${mainPhoto}">
+          <img src="${mainPhoto}" alt="${title} - Portada" loading="lazy">
+        </div>
+        ${thumbsHTML}
+      </div>
+    </div>
+  `;
 }
 
 // ── Vista completa (ficha única) ──────────────────────────────
@@ -224,6 +305,8 @@ function buildSingleHTML(prop) {
 
   return `
     <div class="detail-grid">
+      ${buildGalleryCardHTML(prop.images, "Fotografías del Inmueble", "edit-prop")}
+
       <div class="detail-card">
         <div class="detail-card-header">
           <span class="detail-card-title"><i data-lucide="home"></i>Resumen</span>
@@ -338,6 +421,8 @@ function buildUnitDetailHTML(unit) {
 
   return `
     <div class="detail-grid">
+      ${buildGalleryCardHTML(unit.images, `Fotografías — ${unit.label}`, "edit-unit", unit.id)}
+
       <div class="detail-card">
         <div class="detail-card-header">
           <span class="detail-card-title"><i data-lucide="${unit.category === "local" ? "store" : "door-open"}"></i>${categoryLabel}</span>
@@ -424,7 +509,97 @@ function bindDetailActions(container, unit, isSingle) {
       openEditTenantUnitModal(idUnidad);
     });
   });
+
+  // Abrir imagen en Lightbox al hacer clic
+  container.querySelectorAll("[data-lightbox-src]").forEach(item => {
+    item.addEventListener("click", () => {
+      const src = item.getAttribute("data-lightbox-src");
+      if (src) openLightbox(src);
+    });
+  });
 }
+
+// ── Gestión de Previsualización y Subida de Fotografías ──────
+function renderPhotoPreviews(photoArray, previewContainer, errorElement) {
+  if (!previewContainer) return;
+  previewContainer.innerHTML = "";
+
+  photoArray.forEach((item, index) => {
+    const src = typeof item === "string" ? item : item.previewUrl;
+    const div = document.createElement("div");
+    div.className = "photo-preview-item";
+    div.innerHTML = `
+      <img src="${src}" alt="Previsualización ${index + 1}">
+      ${index === 0 ? `<span class="photo-cover-badge">Portada</span>` : ""}
+      <button type="button" class="photo-remove-btn" data-index="${index}" aria-label="Eliminar foto">✕</button>
+    `;
+
+    div.querySelector(".photo-remove-btn").addEventListener("click", () => {
+      photoArray.splice(index, 1);
+      if (errorElement) errorElement.textContent = "";
+      renderPhotoPreviews(photoArray, previewContainer, errorElement);
+    });
+
+    previewContainer.appendChild(div);
+  });
+}
+
+function handlePhotoInputSelection(inputEl, photoArray, previewContainer, errorElement) {
+  const files = Array.from(inputEl.files || []);
+  if (!files.length) return;
+
+  if (photoArray.length + files.length > MAX_PHOTOS) {
+    if (errorElement) {
+      errorElement.textContent = `Máximo ${MAX_PHOTOS} fotografías permitidas.`;
+    }
+    inputEl.value = "";
+    return;
+  }
+
+  if (errorElement) errorElement.textContent = "";
+
+  files.forEach(file => {
+    if (!file.type.startsWith("image/")) return;
+    const previewUrl = URL.createObjectURL(file);
+    photoArray.push({ file, previewUrl });
+  });
+
+  inputEl.value = "";
+  renderPhotoPreviews(photoArray, previewContainer, errorElement);
+}
+
+ePropPhotosInput?.addEventListener("change", () => {
+  handlePhotoInputSelection(ePropPhotosInput, tempPropPhotos, ePropPhotosPreview, ePropPhotosError);
+});
+
+eUnitPhotosInput?.addEventListener("change", () => {
+  handlePhotoInputSelection(eUnitPhotosInput, tempUnitPhotos, eUnitPhotosPreview, eUnitPhotosError);
+});
+
+async function processPhotosArray(photoArray) {
+  const finalUrls = [];
+  for (const item of photoArray) {
+    if (typeof item === "string") {
+      finalUrls.push(item);
+    } else if (item && item.file) {
+      const uploadedUrl = await uploadImageToCloud(item.file);
+      finalUrls.push(uploadedUrl);
+    }
+  }
+  return finalUrls;
+}
+
+// ── Lightbox ──────────────────────────────────────────────────
+function openLightbox(src) {
+  if (!lightboxModal || !lightboxImage) return;
+  lightboxImage.src = src;
+  showModal(lightboxModal);
+}
+
+lightboxClose?.addEventListener("click", () => hideModal(lightboxModal));
+lightboxModal?.addEventListener("click", e => {
+  if (e.target === lightboxModal) hideModal(lightboxModal);
+});
 
 // ── Modal editar propiedad ────────────────────────────────────
 function openEditPropModal() {
@@ -446,6 +621,11 @@ function openEditPropModal() {
   const priceInput = document.getElementById("ePropPrice");
   if (priceInput) priceInput.value = currentProp.price || "";
 
+  // Inicializar fotos actuales de la propiedad
+  tempPropPhotos = Array.isArray(currentProp.images) ? [...currentProp.images] : [];
+  if (ePropPhotosError) ePropPhotosError.textContent = "";
+  renderPhotoPreviews(tempPropPhotos, ePropPhotosPreview, ePropPhotosError);
+
   showModal(modalEditProp);
 }
 
@@ -454,8 +634,16 @@ modalEditProp.addEventListener("click", e => { if (e.target === modalEditProp) h
 
 editPropForm.addEventListener("submit", async e => {
   e.preventDefault();
+
+  if (tempPropPhotos.length === 0) {
+    if (ePropPhotosError) {
+      ePropPhotosError.textContent = "Debes subir al menos 1 fotografía del inmueble.";
+    }
+    return;
+  }
+
   editPropSubmit.disabled = true;
-  editPropSubmit.textContent = "Guardando…";
+  editPropSubmit.textContent = "Subiendo fotos y guardando…";
 
   const user = getCurrentUser();
   if (!user || !user.uid) {
@@ -465,18 +653,21 @@ editPropForm.addEventListener("submit", async e => {
     return;
   }
 
-  const data = {
-    name: document.getElementById("ePropName").value.trim(),
-    location: document.getElementById("ePropLocation").value.trim(),
-    status: document.getElementById("ePropStatus").value,
-    description: document.getElementById("ePropDescription").value.trim(),
-  };
-
-  if (currentProp.rentMode === "completo") {
-    data.price = Number(document.getElementById("ePropPrice")?.value) || null;
-  }
-
   try {
+    const uploadedImages = await processPhotosArray(tempPropPhotos);
+
+    const data = {
+      name: document.getElementById("ePropName").value.trim(),
+      location: document.getElementById("ePropLocation").value.trim(),
+      status: document.getElementById("ePropStatus").value,
+      description: document.getElementById("ePropDescription").value.trim(),
+      images: uploadedImages
+    };
+
+    if (currentProp.rentMode === "completo") {
+      data.price = Number(document.getElementById("ePropPrice")?.value) || null;
+    }
+
     await updateProperty(propId, data, user.uid);
     currentProp = { ...currentProp, ...data };
     renderHeader(currentProp);
@@ -492,6 +683,9 @@ editPropForm.addEventListener("submit", async e => {
     hideModal(modalEditProp);
   } catch (err) {
     console.error("Error actualizando propiedad:", err);
+    if (ePropPhotosError) {
+      ePropPhotosError.textContent = "Error al procesar las fotografías. Intenta nuevamente.";
+    }
   } finally {
     editPropSubmit.disabled = false;
     editPropSubmit.textContent = "Guardar Cambios";
@@ -515,6 +709,11 @@ function openEditUnitModal(unit) {
   document.getElementById("eTenantEmail").value = unit.tenant?.email || "";
   document.getElementById("eLeaseEnd").value = unit.tenant?.leaseEnd || "";
   document.getElementById("eUnitNotes").value = unit.notes || "";
+
+  // Inicializar fotos actuales de la unidad
+  tempUnitPhotos = Array.isArray(unit.images) ? [...unit.images] : [];
+  if (eUnitPhotosError) eUnitPhotosError.textContent = "";
+  renderPhotoPreviews(tempUnitPhotos, eUnitPhotosPreview, eUnitPhotosError);
   
   showModal(modalEditUnit);
 }
@@ -524,27 +723,40 @@ modalEditUnit.addEventListener("click", e => { if (e.target === modalEditUnit) h
 
 editUnitForm.addEventListener("submit", async e => {
   e.preventDefault();
+
+  if (tempUnitPhotos.length === 0) {
+    if (eUnitPhotosError) {
+      eUnitPhotosError.textContent = "Debes agregar al menos 1 fotografía para esta unidad.";
+    }
+    return;
+  }
+
   const submitBtn = editUnitForm.querySelector('[type="submit"]');
-  submitBtn.disabled = true; submitBtn.textContent = "Guardando…";
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Subiendo fotos y guardando…";
 
   const unitId = document.getElementById("editUnitId").value;
-  const data = {
-    label: document.getElementById("eUnitLabel").value.trim(),
-    status: document.getElementById("eUnitStatus").value,
-    price: Number(document.getElementById("eUnitPrice").value) || 0,
-    area: Number(document.getElementById("eUnitArea").value) || null,
-    description: document.getElementById("eUnitDesc").value.trim(),
-    notes: document.getElementById("eUnitNotes").value.trim(),
-    tenant: {
-      name: document.getElementById("eTenantName").value.trim(),
-      phone: document.getElementById("eTenantPhone").value.trim(),
-      email: document.getElementById("eTenantEmail").value.trim(),
-      leaseEnd: document.getElementById("eLeaseEnd").value || null,
-    },
-  };
-  if (!data.tenant.name) data.tenant = null;
 
   try {
+    const uploadedImages = await processPhotosArray(tempUnitPhotos);
+
+    const data = {
+      label: document.getElementById("eUnitLabel").value.trim(),
+      status: document.getElementById("eUnitStatus").value,
+      price: Number(document.getElementById("eUnitPrice").value) || 0,
+      area: Number(document.getElementById("eUnitArea").value) || null,
+      description: document.getElementById("eUnitDesc").value.trim(),
+      notes: document.getElementById("eUnitNotes").value.trim(),
+      images: uploadedImages,
+      tenant: {
+        name: document.getElementById("eTenantName").value.trim(),
+        phone: document.getElementById("eTenantPhone").value.trim(),
+        email: document.getElementById("eTenantEmail").value.trim(),
+        leaseEnd: document.getElementById("eLeaseEnd").value || null,
+      },
+    };
+    if (!data.tenant.name) data.tenant = null;
+
     await updateUnit(propId, unitId, data);
     const idx = currentUnits.findIndex(u => u.id === unitId);
     if (idx !== -1) currentUnits[idx] = { ...currentUnits[idx], ...data };
@@ -555,14 +767,19 @@ editUnitForm.addEventListener("submit", async e => {
     hideModal(modalEditUnit);
   } catch (err) {
     console.error("Error actualizando unidad:", err);
+    if (eUnitPhotosError) {
+      eUnitPhotosError.textContent = "Error al subir las fotografías. Intenta de nuevo.";
+    }
   } finally {
-    submitBtn.disabled = false; submitBtn.textContent = "Guardar Unidad";
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Guardar Unidad";
   }
 });
 
 // ── Escape ────────────────────────────────────────────────────
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
+    if (lightboxModal && !lightboxModal.hidden) hideModal(lightboxModal);
     if (!modalEditProp.hidden) hideModal(modalEditProp);
     if (!modalEditUnit.hidden) hideModal(modalEditUnit);
     const modalRev = document.getElementById("modalReview");

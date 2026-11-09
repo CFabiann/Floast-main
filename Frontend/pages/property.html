@@ -144,6 +144,21 @@
           <label for="ePropDescription">Descripción general</label>
           <textarea id="ePropDescription" rows="3" placeholder="Describe el inmueble..."></textarea>
         </div>
+
+        <!-- Fotografías de la propiedad -->
+        <div class="form-group">
+          <label>Fotografías del inmueble (Mín. 1, Máx. 5)</label>
+          <div class="photo-uploader" id="ePropPhotoUploader">
+            <label for="ePropPhotosInput" class="photo-upload-btn">
+              <i data-lucide="camera"></i>
+              <span>Seleccionar fotos</span>
+            </label>
+            <input type="file" id="ePropPhotosInput" accept="image/*" multiple hidden>
+            <div class="photo-preview-grid" id="ePropPhotosPreview"></div>
+          </div>
+          <span class="error-message" id="ePropPhotosError"></span>
+        </div>
+
         <div class="modal-actions">
           <button type="button" class="btn-secondary" id="editPropCancel">Cancelar</button>
           <button type="submit" class="btn-submit" id="editPropSubmit">Guardar Cambios</button>
@@ -281,6 +296,20 @@
           <textarea id="eUnitDesc" rows="2" placeholder="Describe la habitación o local..."></textarea>
         </div>
 
+        <!-- Fotografías de la unidad (habitación o local) -->
+        <div class="form-group">
+          <label>Fotografías de la unidad (Mín. 1, Máx. 5)</label>
+          <div class="photo-uploader" id="eUnitPhotoUploader">
+            <label for="eUnitPhotosInput" class="photo-upload-btn">
+              <i data-lucide="camera"></i>
+              <span>Agregar fotos del cuarto / local</span>
+            </label>
+            <input type="file" id="eUnitPhotosInput" accept="image/*" multiple hidden>
+            <div class="photo-preview-grid" id="eUnitPhotosPreview"></div>
+          </div>
+          <span class="error-message" id="eUnitPhotosError"></span>
+        </div>
+
         <p class="section-sub">Inquilino actual</p>
         <div class="form-row">
           <div class="form-group">
@@ -364,6 +393,16 @@
           <button type="submit" class="btn-submit" id="reviewSubmitBtn">Publicar Reseña</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ── Visor de Fotos en Pantalla Completa (Lightbox) ──────── -->
+  <div class="modal-overlay" id="lightboxModal" hidden>
+    <div class="lightbox-content">
+      <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Cerrar imagen">
+        <i data-lucide="x"></i>
+      </button>
+      <img id="lightboxImage" src="" alt="Vista ampliada del inmueble">
     </div>
   </div>
 

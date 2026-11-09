@@ -179,11 +179,9 @@ export async function addProperty(propertyData) {
       body: JSON.stringify(propertyData),
     });
 
-    // Si el backend nos responde con un error (ej. el error 403 de Límite Alcanzado)
     if (!response.ok) {
-      // Extraemos el mensaje de texto que mandamos desde Spring Boot
       const errorMessage = await response.text();
-      throw new Error(errorMessage); // Lanzamos el error para atraparlo en el dashboard
+      throw new Error(errorMessage); 
     }
 
     const savedProperty = await response.json();

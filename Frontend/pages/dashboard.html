@@ -150,121 +150,164 @@
         </div>
 
         <!-- ── Paso 3: Datos generales ── -->
-        <div class="section-sub" style="margin-top: 1rem;">Políticas y Servicios</div>
-        <div class="form-row" style="margin-top: 0.5rem;">
-          <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
-            <input type="checkbox" id="propPets" style="width: auto; height: auto;">
-            <label for="propPets" style="margin:0;">Acepta Mascotas</label>
+        <div class="prop-step" id="propStep3">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="propName">Nombre del inmueble</label>
+              <input type="text" id="propName" placeholder="Ej. Departamentos Sol" required>
+              <span class="error-message" id="propNameError"></span>
+            </div>
+            <div class="form-group">
+              <label for="propLocation">Ubicación / Dirección</label>
+              <input type="text" id="propLocation" placeholder="Ej. Col. Centro, Calle 5" required>
+              <span class="error-message" id="propLocationError"></span>
+            </div>
           </div>
-          <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
-            <input type="checkbox" id="propChildren" style="width: auto; height: auto;">
-            <label for="propChildren" style="margin:0;">Acepta Niños</label>
+
+          <div class="section-sub" style="margin-top: 0.5rem;">Políticas y Servicios</div>
+          <div class="form-row" style="margin-top: 0.25rem;">
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
+              <input type="checkbox" id="propPets" style="width: auto; height: auto;">
+              <label for="propPets" style="margin:0;">Acepta Mascotas</label>
+            </div>
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
+              <input type="checkbox" id="propChildren" style="width: auto; height: auto;">
+              <label for="propChildren" style="margin:0;">Acepta Niños</label>
+            </div>
           </div>
-        </div>
-        <div class="form-row" style="margin-top: 0.5rem;">
-          <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
-            <input type="checkbox" id="propWifi" style="width: auto; height: auto;">
-            <label for="propWifi" style="margin:0;">Internet</label>
+          <div class="form-row" style="margin-top: 0.25rem;">
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
+              <input type="checkbox" id="propWifi" style="width: auto; height: auto;">
+              <label for="propWifi" style="margin:0;">Internet</label>
+            </div>
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
+              <input type="checkbox" id="propWater" style="width: auto; height: auto;">
+              <label for="propWater" style="margin:0;">Agua Propia</label>
+            </div>
           </div>
-          <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
-            <input type="checkbox" id="propWater" style="width: auto; height: auto;">
-            <label for="propWater" style="margin:0;">Agua Propia</label>
+
+          <!-- Unidades — siempre visible -->
+          <div class="form-row" id="propUnitsRow">
+            <div class="form-group" id="propHabGroup">
+              <label for="propHabCount" id="propHabLabel">Número de habitaciones</label>
+              <input type="number" id="propHabCount" placeholder="Ej. 3" min="1">
+              <span class="error-message" id="propHabCountError"></span>
+            </div>
+            <!-- Solo visible en edificio híbrido -->
+            <div class="form-group" id="propLocalGroup" hidden>
+              <label for="propLocalCount">Número de locales</label>
+              <input type="number" id="propLocalCount" placeholder="Ej. 4" min="0">
+              <span class="error-message" id="propLocalCountError"></span>
+            </div>
+          </div>
+
+          <!-- Precio solo si rentMode = completo -->
+          <div class="form-group" id="propPriceGroup">
+            <label for="propPrice">Renta mensual global ($)</label>
+            <input type="number" id="propPrice" placeholder="Ej. 8500" min="0">
+            <span class="error-message" id="propPriceError"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="propStatus">Estado</label>
+            <select id="propStatus" required>
+              <option value="" disabled selected>Selecciona estado</option>
+              <option value="disponible">Disponible</option>
+              <option value="rentada">Rentada</option>
+              <option value="mantenimiento">En mantenimiento</option>
+            </select>
+            <span class="error-message" id="propStatusError"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="propDescription">Descripción general</label>
+            <textarea id="propDescription" rows="3"
+              placeholder="Describe el inmueble: número de habitaciones, baños, áreas comunes, etc."></textarea>
+          </div>
+
+          <!-- Fotografías obligatorias al crear la propiedad -->
+          <div class="form-group">
+            <label>Fotografías del inmueble (Mín. 1, Máx. 5) *</label>
+            <div class="photo-uploader" id="newPropPhotoUploader">
+              <label for="newPropPhotosInput" class="photo-upload-btn">
+                <i data-lucide="camera"></i>
+                <span>Seleccionar fotos</span>
+              </label>
+              <input type="file" id="newPropPhotosInput" accept="image/*" multiple hidden>
+              <div class="photo-preview-grid" id="newPropPhotosPreview"></div>
+            </div>
+            <span class="error-message" id="newPropPhotosError"></span>
+          </div>
+
+          <div class="step-nav">
+            <button type="button" class="btn-secondary" id="step3Back">Atrás</button>
+            <button type="submit" class="btn-submit" id="modalSubmit">Guardar Propiedad</button>
           </div>
         </div>
 
-        <!-- Unidades — siempre visible -->
-        <div class="form-row" id="propUnitsRow">
-          <div class="form-group" id="propHabGroup">
-            <label for="propHabCount" id="propHabLabel">Número de habitaciones</label>
-            <input type="number" id="propHabCount" placeholder="Ej. 3" min="1">
-            <span class="error-message" id="propHabCountError"></span>
+        <!-- ── Modo edición: todo en un solo paso ── -->
+        <div class="prop-step" id="propStepEdit">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="editPropName">Nombre</label>
+              <input type="text" id="editPropName" required>
+              <span class="error-message" id="editPropNameError"></span>
+            </div>
+            <div class="form-group">
+              <label for="editPropLocation">Ubicación</label>
+              <input type="text" id="editPropLocation" required>
+              <span class="error-message" id="editPropLocationError"></span>
+            </div>
           </div>
-          <!-- Solo visible en edificio híbrido -->
-          <div class="form-group" id="propLocalGroup" hidden>
-            <label for="propLocalCount">Número de locales</label>
-            <input type="number" id="propLocalCount" placeholder="Ej. 4" min="0">
-            <span class="error-message" id="propLocalCountError"></span>
+          <div class="form-row">
+            <div class="form-group" id="editHabGroup">
+              <label for="editPropHabCount" id="editHabLabel">Número de habitaciones</label>
+              <input type="number" id="editPropHabCount" min="1">
+            </div>
+            <div class="form-group" id="editLocalGroup" hidden>
+              <label for="editPropLocalCount">Número de locales</label>
+              <input type="number" id="editPropLocalCount" min="0">
+            </div>
+          </div>
+          <div class="form-group" id="editPriceGroup">
+            <label for="editPropPrice">Renta mensual global ($)</label>
+            <input type="number" id="editPropPrice" min="0">
+          </div>
+          <div class="form-group">
+            <label for="editPropStatus">Estado</label>
+            <select id="editPropStatus">
+              <option value="disponible">Disponible</option>
+              <option value="rentada">Rentada</option>
+              <option value="mantenimiento">En mantenimiento</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="editPropDescription">Descripción general</label>
+            <textarea id="editPropDescription" rows="3"></textarea>
+          </div>
+
+          <!-- Fotografías en modo edición -->
+          <div class="form-group">
+            <label>Fotografías del inmueble (Mín. 1, Máx. 5) *</label>
+            <div class="photo-uploader" id="editPropPhotoUploader">
+              <label for="editPropPhotosInput" class="photo-upload-btn">
+                <i data-lucide="camera"></i>
+                <span>Agregar / cambiar fotos</span>
+              </label>
+              <input type="file" id="editPropPhotosInput" accept="image/*" multiple hidden>
+              <div class="photo-preview-grid" id="editPropPhotosPreview"></div>
+            </div>
+            <span class="error-message" id="editPropPhotosError"></span>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="modalCancel">Cancelar</button>
+            <button type="submit" class="btn-submit" id="editSubmit">Guardar Cambios</button>
           </div>
         </div>
 
-        <!-- Precio solo si rentMode = completo -->
-        <div class="form-group" id="propPriceGroup">
-          <label for="propPrice">Renta mensual global ($)</label>
-          <input type="number" id="propPrice" placeholder="Ej. 8500" min="0">
-          <span class="error-message" id="propPriceError"></span>
-        </div>
-
-        <div class="form-group">
-          <label for="propStatus">Estado</label>
-          <select id="propStatus" required>
-            <option value="" disabled selected>Selecciona estado</option>
-            <option value="disponible">Disponible</option>
-            <option value="rentada">Rentada</option>
-            <option value="mantenimiento">En mantenimiento</option>
-          </select>
-          <span class="error-message" id="propStatusError"></span>
-        </div>
-
-        <div class="form-group">
-          <label for="propDescription">Descripción general</label>
-          <textarea id="propDescription" rows="3"
-            placeholder="Describe el inmueble: número de habitaciones, baños, áreas comunes, etc."></textarea>
-        </div>
-
-        <div class="step-nav">
-          <button type="button" class="btn-secondary" id="step3Back">Atrás</button>
-          <button type="submit" class="btn-submit" id="modalSubmit">Guardar Propiedad</button>
-        </div>
+      </form>
     </div>
-
-    <!-- ── Modo edición: todo en un solo paso ── -->
-    <div class="prop-step" id="propStepEdit">
-      <div class="form-row">
-        <div class="form-group">
-          <label for="editPropName">Nombre</label>
-          <input type="text" id="editPropName" required>
-          <span class="error-message" id="editPropNameError"></span>
-        </div>
-        <div class="form-group">
-          <label for="editPropLocation">Ubicación</label>
-          <input type="text" id="editPropLocation" required>
-          <span class="error-message" id="editPropLocationError"></span>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group" id="editHabGroup">
-          <label for="editPropHabCount" id="editHabLabel">Número de habitaciones</label>
-          <input type="number" id="editPropHabCount" min="1">
-        </div>
-        <div class="form-group" id="editLocalGroup" hidden>
-          <label for="editPropLocalCount">Número de locales</label>
-          <input type="number" id="editPropLocalCount" min="0">
-        </div>
-      </div>
-      <div class="form-group" id="editPriceGroup">
-        <label for="editPropPrice">Renta mensual global ($)</label>
-        <input type="number" id="editPropPrice" min="0">
-      </div>
-      <div class="form-group">
-        <label for="editPropStatus">Estado</label>
-        <select id="editPropStatus">
-          <option value="disponible">Disponible</option>
-          <option value="rentada">Rentada</option>
-          <option value="mantenimiento">En mantenimiento</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="editPropDescription">Descripción general</label>
-        <textarea id="editPropDescription" rows="3"></textarea>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" id="modalCancel">Cancelar</button>
-        <button type="submit" class="btn-submit" id="editSubmit">Guardar Cambios</button>
-      </div>
-    </div>
-
-    </form>
-  </div>
   </div>
 
   <!-- ── Modal: Confirmar eliminar ─────────────────── -->

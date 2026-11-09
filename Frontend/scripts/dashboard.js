@@ -8,10 +8,11 @@ import {
   updateProperty,
   deleteProperty,
 } from "./propertyService.js";
-import { onAuthChange, logoutUser } from "./auth.js";
+import { onAuthChange, logoutUser, getCurrentUser } from "./auth.js";
 import { openProfileModal } from "./profile.js";
 import { getUserPlan, canAddProperty } from "./planService.js";
 import { renderPlanBadge, showLimitModal } from "./planGate.js";
+import { uploadImageToCloud, MAX_PHOTOS } from "./imageService.js";
 
 // ── Auth ──────────────────────────────────────────────────────
 onAuthChange(async (user) => {
@@ -30,16 +31,14 @@ onAuthChange(async (user) => {
     const fullUser = { ...user, ...profile };
     sessionStorage.setItem("floast_user", JSON.stringify(fullUser));
 
-    updateHeaderUser(fullUser); // Actualiza la UI de arriba
+    updateHeaderUser(fullUser);
 
-    // --- ¡NUEVO! AQUÍ CARGAMOS LAS PROPIEDADES ---
     allProperties = await getProperties();
     renderGrid(allProperties);
   } catch (error) {
     console.error("Error al cargar perfil de usuario:", error);
     updateHeaderUser(user);
 
-    // --- ¡NUEVO! TAMBIÉN LAS CARGAMOS AQUÍ POR SI FALLA EL PERFIL PERO SÍ HAY SESIÓN ---
     allProperties = await getProperties();
     renderGrid(allProperties);
   }
@@ -49,14 +48,11 @@ function updateHeaderUser(user) {
   const name = user.name || user.displayName || user.email || "Usuario";
   document.getElementById("userName").textContent = name;
   document.getElementById("avatarInitials").textContent = getInitials(name);
-  // Extraemos el plan del usuario (si no tiene, por defecto ponemos "Spark")
   const userPlan = user.plan ? user.plan.toUpperCase() : "SPARK";
 
-  // Lo inyectamos en el HTML junto con el texto original
   document.getElementById("userRole").textContent =
     `Plan ${userPlan} · Gestión de Propiedades`;
 
-  // Mostrar foto de perfil si tiene avatar guardado
   const avatarEl = document.getElementById("avatarBtn");
   const initialsEl = document.getElementById("avatarInitials");
   let imgEl = document.getElementById("avatarHeaderImg");
@@ -150,6 +146,11 @@ const propLocalCount = document.getElementById("propLocalCount");
 const step3Back = document.getElementById("step3Back");
 const modalSubmit = document.getElementById("modalSubmit");
 
+// Controles de fotos (Nueva propiedad)
+const newPropPhotosInput = document.getElementById("newPropPhotosInput");
+const newPropPhotosPreview = document.getElementById("newPropPhotosPreview");
+const newPropPhotosError = document.getElementById("newPropPhotosError");
+
 // Paso edición
 const propStepEdit = document.getElementById("propStepEdit");
 const editPropName = document.getElementById("editPropName");
@@ -164,6 +165,11 @@ const editLocalGroup = document.getElementById("editLocalGroup");
 const editPropLocalCount = document.getElementById("editPropLocalCount");
 const editSubmit = document.getElementById("editSubmit");
 
+// Controles de fotos (Editar propiedad)
+const editPropPhotosInput = document.getElementById("editPropPhotosInput");
+const editPropPhotosPreview = document.getElementById("editPropPhotosPreview");
+const editPropPhotosError = document.getElementById("editPropPhotosError");
+
 // Modal eliminar
 const modalDelete = document.getElementById("modalDelete");
 const deleteClose = document.getElementById("deleteClose");
@@ -171,34 +177,18 @@ const deleteCancel = document.getElementById("deleteCancel");
 const deleteConfirm = document.getElementById("deleteConfirm");
 const deletePropName = document.getElementById("deletePropName");
 
-// ── Estado del formulario de nueva propiedad ──────────────────
+// ── Estado del formulario de nueva propiedad y fotos ──────────
 let formState = { type: null, buildingType: null, rentMode: null };
 let allProperties = [];
 let deleteTargetId = null;
+let tempNewPropPhotos = [];
+let tempEditPropPhotos = [];
 
 // ── Iconos por tipo ───────────────────────────────────────────
 const TYPE_ICONS = { vivienda: "house", edificio: "building-2" };
 const TYPE_LABELS = { vivienda: "Vivienda", edificio: "Edificio" };
 const RENT_LABELS = { completo: "Completo", individual: "Por unidades" };
 const BUILDING_LABELS = { normal: "Normal", hibrido: "Híbrido" };
-const STATUS_LABELS = {
-  disponible: "Disponible",
-  rentada: "Rentada",
-  mantenimiento: "Mantenimiento",
-};
-
-// ── Inicialización ────────────────────────────────────────────
-async function init() {
-  try {
-    allProperties = await getProperties();
-    renderGrid(allProperties);
-    renderPlanBadge();
-    lucide.createIcons();
-  } catch (err) {
-    console.error("Error cargando propiedades:", err);
-  }
-}
-//init();
 
 // ── Renderizado grid ──────────────────────────────────────────
 function renderGrid(properties) {
@@ -216,13 +206,11 @@ function buildCard(prop, index) {
   card.dataset.id = prop.id;
   card.style.animationDelay = `${index * 60}ms`;
 
-  // --- EL TRUCO ESTÁ AQUÍ ---
-  // Convertimos lo que viene de Java a minúsculas ("VIVIENDA" -> "vivienda")
   const safeType = prop.type ? prop.type.toLowerCase() : "vivienda";
+  const normalizedType = safeType === "casa" ? "vivienda" : safeType;
 
-  // Usamos 'safeType' en lugar de 'prop.type' para que coincida con tus diccionarios
-  const icon = TYPE_ICONS[safeType] || "building";
-  const typeLabel = TYPE_LABELS[safeType] || safeType;
+  const icon = TYPE_ICONS[normalizedType] || "building";
+  const typeLabel = TYPE_LABELS[normalizedType] || normalizedType;
 
   const rentLabel = RENT_LABELS[prop.rentMode] || "";
   const buildLabel = prop.buildingType
@@ -233,10 +221,18 @@ function buildCard(prop, index) {
       ? `$${Number(prop.price).toLocaleString("es-MX")}<span>/ mes</span>`
       : `<span style="font-size:0.78rem;color:var(--color-text-dim)">Precio por unidad</span>`;
 
-  // Asegúrate de inyectar 'safeType' en el data-type para que tu CSS aplique los colores correctos
+  const coverImg =
+    Array.isArray(prop.images) && prop.images.length > 0
+      ? prop.images[0]
+      : null;
+
+  const illustrationMedia = coverImg
+    ? `<img src="${coverImg}" alt="${prop.name}" class="card-cover-img" loading="lazy">`
+    : `<i data-lucide="${icon}" class="prop-icon"></i>`;
+
   card.innerHTML = `
-    <div class="card-illustration" data-type="${safeType}">
-      <i data-lucide="${icon}" class="prop-icon"></i>
+    <div class="card-illustration" data-type="${normalizedType}">
+      ${illustrationMedia}
       <span class="status-badge" data-status="${prop.status}">${capitalize(prop.status)}</span>
     </div>
     <div class="card-body">
@@ -258,7 +254,6 @@ function buildCard(prop, index) {
     </div>
   `;
 
-  // ... el resto de tu código de los botones se queda intacto
   card.addEventListener("click", (e) => {
     if (e.target.closest(".card-btn")) return;
     window.location.href = `property.html?id=${prop.id}`;
@@ -272,6 +267,82 @@ function buildCard(prop, index) {
     openDeleteModal(prop);
   });
   return card;
+}
+
+// ── Gestión de Previsualización y Subida de Fotografías ──────
+function renderPhotoPreviews(photoArray, previewContainer, errorElement) {
+  if (!previewContainer) return;
+  previewContainer.innerHTML = "";
+
+  photoArray.forEach((item, index) => {
+    const src = typeof item === "string" ? item : item.previewUrl;
+    const div = document.createElement("div");
+    div.className = "photo-preview-item";
+    div.innerHTML = `
+      <img src="${src}" alt="Foto ${index + 1}">
+      ${index === 0 ? `<span class="photo-cover-badge">Portada</span>` : ""}
+      <button type="button" class="photo-remove-btn" aria-label="Eliminar foto">✕</button>
+    `;
+    div.querySelector(".photo-remove-btn").addEventListener("click", () => {
+      photoArray.splice(index, 1);
+      if (errorElement) errorElement.textContent = "";
+      renderPhotoPreviews(photoArray, previewContainer, errorElement);
+    });
+    previewContainer.appendChild(div);
+  });
+}
+
+function handlePhotoSelection(inputEl, photoArray, previewContainer, errorElement) {
+  const files = Array.from(inputEl.files || []);
+  if (!files.length) return;
+
+  if (photoArray.length + files.length > MAX_PHOTOS) {
+    if (errorElement) {
+      errorElement.textContent = `Máximo ${MAX_PHOTOS} fotografías permitidas.`;
+    }
+    inputEl.value = "";
+    return;
+  }
+
+  if (errorElement) errorElement.textContent = "";
+  files.forEach((file) => {
+    if (!file.type.startsWith("image/")) return;
+    photoArray.push({ file, previewUrl: URL.createObjectURL(file) });
+  });
+
+  inputEl.value = "";
+  renderPhotoPreviews(photoArray, previewContainer, errorElement);
+}
+
+newPropPhotosInput?.addEventListener("change", () => {
+  handlePhotoSelection(
+    newPropPhotosInput,
+    tempNewPropPhotos,
+    newPropPhotosPreview,
+    newPropPhotosError
+  );
+});
+
+editPropPhotosInput?.addEventListener("change", () => {
+  handlePhotoSelection(
+    editPropPhotosInput,
+    tempEditPropPhotos,
+    editPropPhotosPreview,
+    editPropPhotosError
+  );
+});
+
+async function uploadPhotoBatch(photoArray) {
+  const uploadedUrls = [];
+  for (const item of photoArray) {
+    if (typeof item === "string") {
+      uploadedUrls.push(item);
+    } else if (item && item.file) {
+      const url = await uploadImageToCloud(item.file);
+      uploadedUrls.push(url);
+    }
+  }
+  return uploadedUrls;
 }
 
 // ── Búsqueda ──────────────────────────────────────────────────
@@ -292,8 +363,6 @@ searchInput.addEventListener("input", () => {
 );
 
 function handleNewPropertyClick() {
-  // Verificamos el límite al confirmar tipo en paso 1,
-  // no aquí, porque aún no sabemos qué tipo va a agregar.
   openNewModal();
 }
 
@@ -302,7 +371,11 @@ function openNewModal() {
   propertyForm.reset();
   formState = { type: null, buildingType: null, rentMode: null };
 
-  // Resetear selecciones visuales
+  // Limpiar fotos temporales
+  tempNewPropPhotos = [];
+  if (newPropPhotosError) newPropPhotosError.textContent = "";
+  renderPhotoPreviews(tempNewPropPhotos, newPropPhotosPreview, newPropPhotosError);
+
   [
     typeVivienda,
     typeEdificio,
@@ -314,10 +387,7 @@ function openNewModal() {
   buildingTypeRow.hidden = true;
   propLocalGroup.hidden = true;
 
-  // Asegurar que el paso de edición esté oculto
   propStepEdit.classList.remove("active");
-
-  // Mostrar pasos, ocultar edición
   propStepsIndicator.hidden = false;
   goToStep(1);
 
@@ -366,7 +436,6 @@ step1Next.addEventListener("click", () => {
     return;
   }
 
-  // Verificar límite del plan
   const plan = getUserPlan();
   const result = canAddProperty(plan, allProperties, formState.type);
 
@@ -374,9 +443,7 @@ step1Next.addEventListener("click", () => {
     hideModal(modalProperty);
     showLimitModal(
       formState.type,
-      // Continuar con Spark: no hacemos nada
       () => {},
-      // Upgrade a Sparkle: actualizar badge y reabrir modal
       () => {
         renderPlanBadge();
         openNewModal();
@@ -408,17 +475,14 @@ step2Next.addEventListener("click", () => {
     return;
   }
 
-  // Precio solo si completo
   propPriceGroup.hidden = formState.rentMode !== "completo";
 
-  // Etiqueta de habitaciones según tipo
   if (formState.type === "vivienda") {
     propHabLabel.textContent = "Número de habitaciones";
   } else {
     propHabLabel.textContent = "Número de habitaciones / cuartos";
   }
 
-  // Locales solo en edificio híbrido
   propLocalGroup.hidden = !(
     formState.type === "edificio" && formState.buildingType === "hibrido"
   );
@@ -431,7 +495,7 @@ step3Back.addEventListener("click", () => goToStep(2));
 
 function goToStep(n) {
   [propStep1, propStep2, propStep3].forEach((s, i) =>
-    s.classList.toggle("active", i === n - 1),
+    s?.classList.toggle("active", i === n - 1),
   );
 
   const dots = [
@@ -445,6 +509,7 @@ function goToStep(n) {
   ];
 
   dots.forEach((d, i) => {
+    if (!d) return;
     d.classList.remove("active", "completed");
     if (i < n - 1) {
       d.classList.add("completed");
@@ -456,10 +521,8 @@ function goToStep(n) {
       d.querySelector(".dot").textContent = i + 1;
     }
   });
-  conns.forEach((c, i) => c.classList.toggle("completed", i < n - 1));
+  conns.forEach((c, i) => c?.classList.toggle("completed", i < n - 1));
 }
-
-import { getCurrentUser } from "./auth.js";
 
 // ── Submit nueva propiedad ────────────────────────────────────
 propertyForm.addEventListener("submit", async (e) => {
@@ -472,66 +535,63 @@ propertyForm.addEventListener("submit", async (e) => {
 
   if (!validateStep3()) return;
 
-  // --- NUEVO: Obtener el usuario activo ---
-  const user = getCurrentUser(); // Asegúrate de usar la función correcta de tu auth.js
+  const user = getCurrentUser();
   if (!user) {
     alert("Debes iniciar sesión para crear propiedades.");
     return;
   }
 
   modalSubmit.disabled = true;
-  modalSubmit.textContent = "Guardando…";
-
-  const data = {
-    userId: user.uid, // <--- ¡VITAL! Spring Boot necesita saber de quién es para contar los límites
-    name: propName.value.trim(),
-    type: formState.type.toUpperCase(), // <--- .toUpperCase() para que coincida con el Enum de Java (CASA o EDIFICIO)
-    buildingType: formState.buildingType,
-    rentMode: formState.rentMode,
-    location: propLocation.value.trim(),
-    price: formState.rentMode === "completo" ? Number(propPrice.value) : null,
-    status: propStatus.value,
-    description: propDescription.value.trim(),
-    habCount: Number(propHabCount.value) || 0,
-    localCount:
-      formState.type === "edificio" && formState.buildingType === "hibrido"
-        ? Number(propLocalCount.value) || 0
-        : 0,
-    policies: {
-      petsAllowed: document.getElementById("propPets").checked,
-      childrenAllowed: document.getElementById("propChildren").checked,
-    },
-    amenities: {
-      hasInternet: document.getElementById("propWifi").checked,
-      hasWater: document.getElementById("propWater").checked,
-    },
-  };
+  modalSubmit.textContent = "Subiendo fotos y guardando…";
 
   try {
-    // Esto ahora disparará el fetch() hacia http://localhost:8080/api/properties
+    const uploadedImages = await uploadPhotoBatch(tempNewPropPhotos);
+
+    const data = {
+      userId: user.uid,
+      name: propName.value.trim(),
+      type: formState.type.toUpperCase(),
+      buildingType: formState.buildingType,
+      rentMode: formState.rentMode,
+      location: propLocation.value.trim(),
+      price: formState.rentMode === "completo" ? Number(propPrice.value) : null,
+      status: propStatus.value,
+      description: propDescription.value.trim(),
+      habCount: Number(propHabCount.value) || 0,
+      localCount:
+        formState.type === "edificio" && formState.buildingType === "hibrido"
+          ? Number(propLocalCount.value) || 0
+          : 0,
+      images: uploadedImages,
+      policies: {
+        petsAllowed: document.getElementById("propPets").checked,
+        childrenAllowed: document.getElementById("propChildren").checked,
+      },
+      amenities: {
+        hasInternet: document.getElementById("propWifi").checked,
+        hasWater: document.getElementById("propWater").checked,
+      },
+    };
+
     const newProp = await addProperty(data);
 
     allProperties.push(newProp);
     renderGrid(allProperties);
     hideModal(modalProperty);
-
-    // Opcional: Un pequeño aviso de éxito
-    // alert("¡Propiedad creada exitosamente!");
   } catch (err) {
     console.error("Error guardando propiedad:", err);
 
-    // --- ALERTA ESTÉTICA CON SWEETALERT2 ---
     Swal.fire({
       icon: "warning",
-      title: "Límite de Plan",
+      title: "Aviso",
       text: err.message,
-      background: "#1a1a1a", // Un gris casi negro para combinar con tu fondo
-      color: "#ffffff", // Texto en blanco para que resalte
-      iconColor: "#ea580c", // El ícono de advertencia en naranja
+      background: "#1a1a1a",
+      color: "#ffffff",
+      iconColor: "#ea580c",
       confirmButtonText: "Entendido",
-      confirmButtonColor: "#ea580c", // El botón en naranja vibrante
+      confirmButtonColor: "#ea580c",
       customClass: {
-        popup: "rounded-2xl border border-gray-700", // Bordes redondeados y un contorno sutil
+        popup: "rounded-2xl border border-gray-700",
         title: "text-xl font-bold",
         confirmButton: "font-bold rounded-lg px-6 py-2",
       },
@@ -548,14 +608,17 @@ function validateStep3() {
     setErr("propName", "propNameError", "Obligatorio.");
     valid = false;
   } else clearErr("propName", "propNameError");
+
   if (!propLocation.value.trim()) {
     setErr("propLocation", "propLocationError", "Obligatorio.");
     valid = false;
   } else clearErr("propLocation", "propLocationError");
+
   if (!propHabCount.value || Number(propHabCount.value) < 1) {
     setErr("propHabCount", "propHabCountError", "Ingresa al menos 1.");
     valid = false;
   } else clearErr("propHabCount", "propHabCountError");
+
   if (
     formState.type === "edificio" &&
     formState.buildingType === "hibrido" &&
@@ -568,26 +631,37 @@ function validateStep3() {
     );
     valid = false;
   } else clearErr("propLocalCount", "propLocalCountError");
+
   if (formState.rentMode === "completo" && !propPrice.value) {
     setErr("propPrice", "propPriceError", "Ingresa el precio.");
     valid = false;
   } else clearErr("propPrice", "propPriceError");
+
   if (!propStatus.value) {
     setErr("propStatus", "propStatusError", "Selecciona un estado.");
     valid = false;
   } else clearErr("propStatus", "propStatusError");
+
+  if (tempNewPropPhotos.length === 0) {
+    if (newPropPhotosError) {
+      newPropPhotosError.textContent = "Debes subir al menos 1 fotografía del inmueble.";
+    }
+    valid = false;
+  } else if (newPropPhotosError) {
+    newPropPhotosError.textContent = "";
+  }
+
   return valid;
 }
 
 // ── Editar propiedad ──────────────────────────────────────────
 function openEditModal(prop) {
   propIdInput.value = prop.id;
-  // Modo edición: limpiar pasos y mostrar solo el de edición
   propStepsIndicator.hidden = true;
   [propStep1, propStep2, propStep3].forEach((s) =>
-    s.classList.remove("active"),
+    s?.classList.remove("active"),
   );
-  propStepEdit.classList.remove("active"); // asegurar limpio antes de activar
+  propStepEdit.classList.remove("active");
   propStepEdit.classList.add("active");
 
   editPropName.value = prop.name;
@@ -597,23 +671,39 @@ function openEditModal(prop) {
   editPriceGroup.hidden = prop.rentMode !== "completo";
   editPropPrice.value = prop.price || "";
 
-  // Unidades
+  const safeType = prop.type ? prop.type.toLowerCase() : "vivienda";
   editPropHabCount.value = prop.habCount || "";
   editHabLabel.textContent =
-    prop.type === "vivienda"
+    safeType === "vivienda" || safeType === "casa"
       ? "Número de habitaciones"
       : "Número de habitaciones / cuartos";
-  const isHibrido = prop.type === "edificio" && prop.buildingType === "hibrido";
+  const isHibrido = safeType === "edificio" && prop.buildingType === "hibrido";
   editLocalGroup.hidden = !isHibrido;
   editPropLocalCount.value = isHibrido ? prop.localCount || "" : "";
+
+  // Cargar fotos existentes de la propiedad en el modal de edición
+  tempEditPropPhotos = Array.isArray(prop.images) ? [...prop.images] : [];
+  if (editPropPhotosError) editPropPhotosError.textContent = "";
+  renderPhotoPreviews(
+    tempEditPropPhotos,
+    editPropPhotosPreview,
+    editPropPhotosError
+  );
 
   modalTitle.textContent = "Editar Propiedad";
   showModal(modalProperty);
 }
 
 async function handleEdit() {
+  if (tempEditPropPhotos.length === 0) {
+    if (editPropPhotosError) {
+      editPropPhotosError.textContent = "El inmueble debe tener al menos 1 fotografía.";
+    }
+    return;
+  }
+
   editSubmit.disabled = true;
-  editSubmit.textContent = "Guardando…";
+  editSubmit.textContent = "Subiendo fotos y guardando…";
 
   const id = propIdInput.value;
   const prop = allProperties.find((p) => p.id === id);
@@ -625,19 +715,23 @@ async function handleEdit() {
     return;
   }
 
-  const isHibrido =
-    prop?.type === "edificio" && prop?.buildingType === "hibrido";
-  const data = {
-    name: editPropName.value.trim(),
-    location: editPropLocation.value.trim(),
-    status: editPropStatus.value,
-    description: editPropDescription.value.trim(),
-    price: prop?.rentMode === "completo" ? Number(editPropPrice.value) : null,
-    habCount: Number(editPropHabCount.value) || 0,
-    localCount: isHibrido ? Number(editPropLocalCount.value) || 0 : 0,
-  };
-
   try {
+    const uploadedImages = await uploadPhotoBatch(tempEditPropPhotos);
+    const safeType = prop?.type ? prop.type.toLowerCase() : "vivienda";
+    const isHibrido =
+      safeType === "edificio" && prop?.buildingType === "hibrido";
+
+    const data = {
+      name: editPropName.value.trim(),
+      location: editPropLocation.value.trim(),
+      status: editPropStatus.value,
+      description: editPropDescription.value.trim(),
+      price: prop?.rentMode === "completo" ? Number(editPropPrice.value) : null,
+      habCount: Number(editPropHabCount.value) || 0,
+      localCount: isHibrido ? Number(editPropLocalCount.value) || 0 : 0,
+      images: uploadedImages,
+    };
+
     const updatedProp = await updateProperty(id, data, user.uid);
     const idx = allProperties.findIndex((p) => p.id === id);
     if (idx !== -1) {
@@ -658,7 +752,7 @@ async function handleEdit() {
   btn?.addEventListener("click", () => {
     propStepEdit.classList.remove("active");
     [propStep1, propStep2, propStep3].forEach((s) =>
-      s.classList.remove("active"),
+      s?.classList.remove("active"),
     );
     propStepsIndicator.hidden = false;
     hideModal(modalProperty);
@@ -756,15 +850,13 @@ function clearErr(inputId, errorId) {
   const e = document.getElementById(errorId);
   if (e) e.textContent = "";
 }
+
 // ── Auto-abrir modal si viene de explorar ─────────────────────
 document.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("action") === "new") {
-    // Esperamos medio segundo a que carguen los datos e iconos y abrimos el modal
     setTimeout(() => {
-      handleNewPropertyClick(); // Esta función ya existe en tu código original
-
-      // Limpiamos la URL para que si recarga la página no se vuelva a abrir solo
+      handleNewPropertyClick();
       window.history.replaceState({}, document.title, window.location.pathname);
     }, 500);
   }
