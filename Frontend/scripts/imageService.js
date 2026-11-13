@@ -4,8 +4,8 @@
 // ============================================================
 
 // Configura aquí tus datos gratuitos de Cloudinary (Settings -> Upload -> Upload Presets -> Unsigned)
-const CLOUDINARY_CLOUD_NAME = ""; // Ej: "domi-app"
-const CLOUDINARY_UPLOAD_PRESET = ""; // Ej: "domi_unsigned"
+const CLOUDINARY_CLOUD_NAME = "awuroa86";
+const CLOUDINARY_UPLOAD_PRESET = "floast_unsigned"; // créalo en Cloudinary como Unsigned
 
 export const MAX_PHOTOS = 5;
 
@@ -59,7 +59,7 @@ export function compressImage(file, maxWidth = 1200, quality = 0.8) {
  * para poder probar todo el flujo en el navegador.
  */
 export async function uploadImageToCloud(file) {
-  const { blob, dataUrl } = await compressImage(file);
+  const { blob } = await compressImage(file);
 
   // Si ya configuraste Cloudinary, sube el archivo comprimido
   if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET) {
@@ -76,13 +76,16 @@ export async function uploadImageToCloud(file) {
     );
 
     if (!response.ok) {
-      throw new Error("Error al subir la imagen a Cloudinary");
+      throw new Error("Error al subir la imagen a Cloudinary (revisa cloud name y upload preset unsigned)");
     }
 
     const data = await response.json();
     return data.secure_url;
   }
 
-  // Modo de prueba inmediato mientras configuran las credenciales de Cloudinary
-  return dataUrl;
+  // Sin credenciales no se puede guardar: el backend solo acepta URLs de Cloudinary
+  // (un data:base64 excedería el límite de Firestore y es rechazado con 400).
+  throw new Error(
+    "Cloudinary no está configurado: completa CLOUDINARY_CLOUD_NAME y CLOUDINARY_UPLOAD_PRESET en imageService.js"
+  );
 }

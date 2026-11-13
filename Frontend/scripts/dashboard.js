@@ -567,10 +567,11 @@ propertyForm.addEventListener("submit", async (e) => {
         petsAllowed: document.getElementById("propPets").checked,
         childrenAllowed: document.getElementById("propChildren").checked,
       },
-      amenities: {
-        hasInternet: document.getElementById("propWifi").checked,
-        hasWater: document.getElementById("propWater").checked,
-      },
+      // El backend y el explorador esperan una lista: ["internet", "agua"]
+      amenities: [
+        ...(document.getElementById("propWifi").checked ? ["internet"] : []),
+        ...(document.getElementById("propWater").checked ? ["agua"] : []),
+      ],
     };
 
     const newProp = await addProperty(data);
